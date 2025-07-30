@@ -5,28 +5,40 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup GitVersion
-        uses: gittools/actions/gitversion/setup@v1
+        uses: gittools/actions/gitversion/setup@v4
 
       - name: Run GitVersion
         id: gitversion
-        uses: gittools/actions/gitversion/execute@v1
+        uses: gittools/actions/gitversion/execute@v4
 
       - name: Display version
-        run: echo "Version: ${{ steps.gitversion.outputs.semVer }}"
+        run: |
+          echo "Version: ${{ steps.gitversion.outputs.semVer }}"
+
+      - name: Set up permissions for build
+        run: chmod +x bin/log_json
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.gitversion.outputs.semVer }}
-          name: Release ${{ steps.gitversion.outputs.semVer }}
+          tag_name: v${{ steps.gitversion.outputs.semVer }}
+          name: Release v${{ steps.gitversion.outputs.semVer }}
+          draft: false
+          prerelease: false
           files: bin/log_json
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
