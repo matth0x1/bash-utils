@@ -31,6 +31,9 @@ jobs:
       - name: Set up permissions for build
         run: chmod +x bin/log_json
 
+      - name: Create version file
+        run: echo "${{ steps.gitversion.outputs.semVer }}" > bin/version
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -38,7 +41,9 @@ jobs:
           name: Release v${{ steps.gitversion.outputs.semVer }}
           draft: false
           prerelease: false
-          files: bin/log_json
+          files: |
+            bin/log_json
+            bin/version
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

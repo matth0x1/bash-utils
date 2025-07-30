@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 
+# Check if jq is installed
+if ! command -v jq >/dev/null 2>&1; then
+  echo "Error: jq is required but not installed" >&2
+  exit 1
+fi
+
 log_json() {
+  if [ $# -lt 2 ]; then
+    echo "Error: Both level and message are required" >&2
+    echo "Usage: log_json LEVEL MESSAGE" >&2
+    return 1
+  fi
+  
   local level="$1"
   local message="$2"
 
@@ -12,9 +24,14 @@ log_json() {
 }
 
 if [[ "$1" == "--version" ]]; then
-  VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-  echo "log_json version $VERSION"
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+  if [ -f "$SCRIPT_DIR/version" ]; then
+    VERSION=$(cat "$SCRIPT_DIR/version")
+  else
+    VERSION="unknown"
+  fi
+  echo "log_json version v$VERSION"
   exit 0
 fi
 
-log_json "$@"
+log_json "$@" || exit 1
