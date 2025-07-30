@@ -1,0 +1,20 @@
+mode: ContinuousDelivery
+
+branches:
+  main:
+    regex: ^main$
+    increment: Patch
+    track-merge-target: true
+
+  feature:
+    regex: ^feature/
+    increment: Minor
+    track-merge-target: false
+
+  hotfix:
+    regex: ^hotfix/
+    increment: Patch
+    track-merge-target: true
+
+ignore:
+  sha: []

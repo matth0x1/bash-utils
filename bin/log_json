@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+log_json() {
+  local level="$1"
+  local message="$2"
+
+  echo "$(jq -nc \
+    --arg level "$level" \
+    --arg message "$message" \
+    --arg time "$(date +"%Y-%m-%dT%H:%M:%S.%3N%z" | sed 's/\(..\)\(..\)$/\1:\2/')" \
+    '{timestamp: $time, level: $level, message: $message}')"
+}
+
+if [[ "$1" == "--version" ]]; then
+  VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+  echo "log_json version $VERSION"
+  exit 0
+fi
+
+log_json "$@"
