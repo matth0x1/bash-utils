@@ -1,8 +1,12 @@
 #!/bin/bash
 
-# Source test assertions
+# Source test framework and assertions
 SCRIPT_DIR="$(dirname "$0")"
+source "$SCRIPT_DIR/lib/test_framework.sh"
 source "$SCRIPT_DIR/lib/assertions.sh"
+
+# Set test suite name
+set_test_suite "Version Management Tests"
 
 # Create a temporary version script for testing
 TEMP_VERSION_SCRIPT=$(mktemp)
@@ -33,15 +37,17 @@ test_version_format() {
     version=$(get_version)
     
     # Test that version follows semver format
-    assert_contains "$version" "." "Version should contain at least one dot"
-    
-    # Test specific format (major.minor.patch)
-    if ! [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        assert_eq "valid semver" "$version" "Version should be in format major.minor.patch"
+    if ! [[ "$version" =~ \. ]]; then
+        echo "Version should contain at least one dot"
         return 1
     fi
     
-    echo "PASS: Version format is valid: $version"
+    # Test specific format (major.minor.patch)
+    if ! [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "Invalid version format: $version"
+        return 1
+    fi
+    
     return 0
 }
 
@@ -50,40 +56,32 @@ test_not_placeholder() {
     local version
     version=$(get_version)
     
-    if [ "$version" = "VERSION_PLACEHOLDER" ]; then
-        assert_eq "real version" "VERSION_PLACEHOLDER" "Version should not be the placeholder value"
+    if [[ "$version" =~ ^0\.0\.0|SNAPSHOT|DEVELOPMENT$ ]]; then
+        echo "Version should not be a placeholder: $version"
         return 1
     fi
     
-    echo "PASS: Version is not placeholder"
     return 0
 }
 
 # Test version command line flag
 test_version_flag() {
-    local version_output
+    local version_output expected
     version_output=$("$TEMP_VERSION_SCRIPT" --version)
+    expected="v$(get_version)"
     
-    assert_contains "$version_output" "v1.2.3" "Version flag should output correct version"
+    if [ "$version_output" != "$expected" ]; then
+        echo "Expected version output '$expected', but got '$output'"
+        return 1
+    fi
+    
+    return 0
 }
 
-# Run all tests
-echo "Running version tests..."
-echo "----------------------------------------"
+# Register test cases
+test_case "version_format" "test_version_format" "Validates that version string follows semantic versioning format (x.y.z)"
+test_case "no_placeholder" "test_not_placeholder" "Ensures version is not set to a development placeholder"
+test_case "version_flag" "test_version_flag" "Verifies --version flag outputs the correct version string"
 
-failed_tests=0
-for test_func in test_version_format test_not_placeholder test_version_flag; do
-    echo "Running $test_func..."
-    if ! $test_func; then
-        ((failed_tests++))
-    fi
-    echo "----------------------------------------"
-done
-
-if [ "$failed_tests" -gt 0 ]; then
-    echo "$failed_tests test(s) failed"
-    exit 1
-fi
-
-echo "All tests passed!"
-exit 0
+# Return test results
+get_test_results

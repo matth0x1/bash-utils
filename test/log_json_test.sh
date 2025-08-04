@@ -1,13 +1,17 @@
 #!/bin/bash
 
-# Source test assertions
+# Source test framework and assertions
 SCRIPT_DIR="$(dirname "$0")"
+source "$SCRIPT_DIR/lib/test_framework.sh"
 source "$SCRIPT_DIR/lib/assertions.sh"
+
+# Set test suite name
+set_test_suite "JSON Logger Tests"
 
 # Get the log_json function without executing the script
 eval "$(sed '/^log_json "\$@" || exit 1$/d' "$SCRIPT_DIR/../bin/log_json")"
 
-# Test cases
+# Test functions
 test_info_log() {
     local output
     output=$(log_json "INFO" "test message")
@@ -62,23 +66,12 @@ test_no_args() {
     assert_contains "$output" "Both level and message are required" "Should error on no arguments"
 }
 
-# Run all tests
-echo "Running log_json tests..."
-echo "----------------------------------------"
+# Register test cases
+test_case "info_logging" "test_info_log" "Verifies INFO level logs are correctly formatted with message and timestamp"
+test_case "error_logging" "test_error_log" "Verifies ERROR level logs are correctly formatted with message and timestamp"
+test_case "debug_logging" "test_debug_log" "Verifies DEBUG level logs are correctly formatted with message and timestamp"
+test_case "missing_message" "test_missing_args" "Validates error handling when message argument is missing"
+test_case "no_arguments" "test_no_args" "Validates error handling when no arguments are provided"
 
-failed_tests=0
-for test_func in test_info_log test_error_log test_debug_log test_missing_args test_no_args; do
-    echo "Running $test_func..."
-    if ! $test_func; then
-        ((failed_tests++))
-    fi
-    echo "----------------------------------------"
-done
-
-if [ "$failed_tests" -gt 0 ]; then
-    echo "$failed_tests test(s) failed"
-    exit 1
-fi
-
-echo "All tests passed!"
-exit 0
+# Return test results
+get_test_results
