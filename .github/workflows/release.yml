@@ -26,10 +26,10 @@ jobs:
         uses: gittools/actions/gitversion/execute@v4
 
       - name: Set up permissions for build
-        run: chmod +x bin/log_json
+        run: chmod +x bin/log_json bin/version.sh
 
-      - name: Create version file
-        run: echo "${{ steps.gitversion.outputs.semVer }}" > bin/version
+      - name: Inject version into shell script
+        run: sed -i "s/VERSION_PLACEHOLDER/${{ steps.gitversion.outputs.semVer }}/" bin/version.sh
 
       - name: Create release package
         run: |
