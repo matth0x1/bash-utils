@@ -35,7 +35,15 @@ jobs:
 
       - name: Run tests
         run: ./test/run_tests.sh
-
+      
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()  # Run this step even if tests failed
+        with:
+          files: "test/test-results.xml"
+          report_individual_runs: true
+          check_name: "Test Results"
+      
       - name: Create release package
         run: |
           mkdir -p release
