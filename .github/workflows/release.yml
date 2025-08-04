@@ -1,4 +1,5 @@
 name: Release
+run-name: Release v${{ github.event.head_commit.message }}
 
 on:
   push:
@@ -24,10 +25,6 @@ jobs:
         id: gitversion
         uses: gittools/actions/gitversion/execute@v4
 
-      - name: Display version
-        run: |
-          echo "Version: ${{ steps.gitversion.outputs.semVer }}"
-
       - name: Set up permissions for build
         run: chmod +x bin/log_json
 
@@ -48,8 +45,7 @@ jobs:
           prerelease: false
           files: |
             release/bash-utils-${{ steps.gitversion.outputs.semVer }}.tar.gz
-            bin/log_json
-            bin/version
+            bin/*
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
