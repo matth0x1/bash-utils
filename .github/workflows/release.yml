@@ -8,6 +8,8 @@ on:
 
 permissions:
   contents: write
+  checks: write    # Required for publishing test results
+  pull-requests: write  # Required for PR comments
 
 jobs:
   release:
@@ -34,7 +36,10 @@ jobs:
         run: sed -i "s/VERSION_PLACEHOLDER/${{ steps.gitversion.outputs.semVer }}/" bin/version.sh
 
       - name: Run tests
-        run: ./test/run_tests.sh
+        run: |
+          cd test
+          ./run_tests.sh
+          ls -la test-results.xml  # Verify file exists
       
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
