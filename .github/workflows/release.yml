@@ -30,7 +30,12 @@ jobs:
       - name: Set up permissions
         run: |
           chmod +x bin/log_json bin/version.sh
-          chmod +x test/*.sh
+          chmod +x test/run_tests.sh
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats jq
 
       - name: Inject version into shell script
         run: sed -i "s/VERSION_PLACEHOLDER/${{ steps.gitversion.outputs.semVer }}/" bin/version.sh
@@ -39,13 +44,13 @@ jobs:
         run: |
           cd test
           ./run_tests.sh
-          ls -la test-results.xml  # Verify file exists
+          ls -la ../test-results.xml  # Verify file exists
       
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()  # Run this step even if tests failed
         with:
-          files: "test/test-results.xml"
+          files: "test-results.xml"
           report_individual_runs: true
           check_name: "Test Results"
       

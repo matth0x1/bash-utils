@@ -1,99 +1,71 @@
 #!/bin/bash
 
-# Run all tests
-SCRIPT_DIR="$(dirname "$0")"
-source "$SCRIPT_DIR/lib/test_reporter.sh"
-source "$SCRIPT_DIR/lib/test_framework.sh"
+set -e
 
-run_test_suite() {
-    declare -A failures
-    declare -A test_outputs
-    total_test_files=0
-    total_test_cases=0
-    failed_test_cases=0
-    skip_version_tests=false
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-    # Parse command line arguments
-    while [[ "$#" -gt 0 ]]; do
-        case $1 in
-            --skip-version-tests) skip_version_tests=true ;;
-            *) echo "Unknown parameter: $1"; exit 1 ;;
-        esac
-        shift
-    done
+echo -e "${YELLOW}Running bash-utils tests with bats${NC}"
 
-    # Make scripts executable
-    chmod +x "$SCRIPT_DIR"/*.sh
+# Get the directory where this script is located
+TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$TEST_DIR/.." && pwd)"
 
-    echo "Starting test suite..."
-    echo "===================="
+# Check if bats is available
+if ! command -v bats >/dev/null 2>&1; then
+    echo -e "${RED}Error: bats is required but not installed${NC}" >&2
+    echo "Install bats using one of these methods:" >&2
+    echo "  - Ubuntu/Debian: sudo apt-get install bats" >&2
+    echo "  - macOS with Homebrew: brew install bats-core" >&2
+    echo "  - From source: https://github.com/bats-core/bats-core" >&2
+    exit 1
+fi
 
-for test in "$SCRIPT_DIR"/*_test.sh; do
-    test_name=$(basename "$test")
-    
-    # Skip version tests if requested
-    if [ "$skip_version_tests" = true ] && [ "$test_name" = "version_test.sh" ]; then
-        continue
-    fi
-    
-    ((total_test_files++))
-    echo -n "Running $test_name... "
-    
-    # Run the test file and capture its test results
-    test_output=$("$test" 2>&1)
-    test_status=$?
-    line_num=1
-    file_test_count=0
-    file_failures=0
-    test_names=()
-    test_results=()
-    test_case_outputs=()
+# Check if jq is available (required for log_json tests)
+if ! command -v jq >/dev/null 2>&1; then
+    echo -e "${RED}Error: jq is required but not installed${NC}" >&2
+    echo "Install jq using one of these methods:" >&2
+    echo "  - Ubuntu/Debian: sudo apt-get install jq" >&2
+    echo "  - macOS with Homebrew: brew install jq" >&2
+    exit 1
+fi
 
-    # Read test results from the output
-    # Format: test_count, failures, test_names, test_results, test_outputs
-    if [ $test_status -eq 0 ]; then
-        # Parse the test results
-        while IFS= read -r line; do
-            case $((line_num++)) in
-                1) local file_test_count=$line
-                   ((total_test_cases+=file_test_count)) ;;
-                2) local file_failures=$line
-                   ((failed_test_cases+=file_failures)) ;;
-                3) IFS=',' read -r -a test_names <<< "$line" ;;
-                4) IFS=',' read -r -a test_results <<< "$line" ;;
-                5) IFS=',' read -r -a test_case_outputs <<< "$line" ;;
-            esac
-        done <<< "$test_output"
+echo "Using bats version: $(bats --version)"
+echo "Project root: $PROJECT_ROOT"
+echo "Test directory: $TEST_DIR"
 
-        # Store results for each test case
-        for i in "${!test_names[@]}"; do
-            local full_test_name="${test_name}::${test_names[i]}"
-            if [ "${test_results[i]}" = "1" ]; then
-                failures["$full_test_name"]="${test_case_outputs[i]}"
-            fi
-            test_outputs["$full_test_name"]="${test_case_outputs[i]}"
-        done
+# Create output directory for test results
+mkdir -p "$PROJECT_ROOT/test-output"
 
-        if [ "$file_failures" -eq 0 ]; then
-            echo -e "${GREEN}PASS${NC} ($file_test_count tests)"
-        else
-            echo -e "${RED}FAIL${NC} ($file_failures/$file_test_count failed)"
-        fi
+# Run bats tests with JUnit XML output
+echo -e "${YELLOW}Running tests...${NC}"
+
+# Use bats with TAP formatter and convert to JUnit XML
+if command -v bats >/dev/null 2>&1; then
+    # Run bats tests and capture both stdout and the exit code
+    if bats --formatter junit "$TEST_DIR"/*.bats > "$PROJECT_ROOT/test-results.xml" 2>&1; then
+        echo -e "${GREEN}✓ All tests passed!${NC}"
+        
+        # Also create a copy in the test directory for compatibility
+        cp "$PROJECT_ROOT/test-results.xml" "$TEST_DIR/test-results.xml" 2>/dev/null || true
+        
+        # Display summary
+        echo -e "${GREEN}Test results saved to test-results.xml${NC}"
+        exit 0
     else
-        echo -e "${RED}FAIL${NC} (test file error)"
-        failures["$test_name"]="$test_output"
-        test_outputs["$test_name"]="$test_output"
-        ((failed_test_cases++))
+        echo -e "${RED}✗ Some tests failed${NC}"
+        
+        # Still copy the results even if tests failed
+        cp "$PROJECT_ROOT/test-results.xml" "$TEST_DIR/test-results.xml" 2>/dev/null || true
+        
+        # Show the test results
+        echo -e "${RED}Test results saved to test-results.xml${NC}"
+        exit 1
     fi
-done
-
-    # Print test summary
-    print_test_summary "$total_test_cases" "$failed_test_cases" failures
-
-    # Generate JUnit XML report with all collected information
-    generate_junit_xml "$total_test_cases" "$failed_test_cases" test_outputs failures "test-results.xml" test_times test_descriptions    return $failed_test_cases
-}
-
-# Run the test suite and exit with its status
-run_test_suite "$@"
-exit $?
+else
+    echo -e "${RED}Error: Could not run bats${NC}" >&2
+    exit 1
+fi
