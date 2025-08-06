@@ -6,21 +6,189 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
+show_help() {
+  cat << 'EOF'
+Usage: log_json [OPTIONS] LEVEL MESSAGE [KEY=VALUE ...]
+
+Generate structured JSON log entries with timestamp, level, message and optional fields.
+
+Arguments:
+  LEVEL          Log level (e.g., DEBUG, INFO, WARN, ERROR, FATAL)
+  MESSAGE        Log message
+  KEY=VALUE      Additional fields to include in the log entry
+
+Options:
+  -h, --help     Show this help message
+  --version      Show version information
+  --pid          Include process ID in log entry
+  --hostname     Include hostname in log entry
+  --user         Include current user in log entry
+  --context CTX  Add context field with specified value
+
+Examples:
+  log_json INFO "Application started"
+  log_json ERROR "Database connection failed" service=api database=postgres
+  log_json --pid --hostname WARN "High memory usage" memory_usage=85%
+  log_json --context "user-auth" INFO "Login successful" user_id=12345 ip=127.0.0.1
+
+Supported log levels: DEBUG, INFO, WARN, WARNING, ERROR, FATAL
+EOF
+}
+
 log_json() {
-  if [ $# -lt 2 ]; then
+  local include_pid=false
+  local include_hostname=false
+  local include_user=false
+  local context=""
+  local -a args=()
+  
+  # Parse options
+  while [[ $# -gt 0 ]]; do
+    case $1 in
+      -h|--help)
+        show_help
+        return 0
+        ;;
+      --pid)
+        include_pid=true
+        shift
+        ;;
+      --hostname)
+        include_hostname=true
+        shift
+        ;;
+      --user)
+        include_user=true
+        shift
+        ;;
+      --context)
+        context="$2"
+        shift 2
+        ;;
+      -*)
+        echo "Error: Unknown option $1" >&2
+        echo "Use --help for usage information" >&2
+        return 1
+        ;;
+      *)
+        args+=("$1")
+        shift
+        ;;
+    esac
+  done
+  
+  # Check minimum required arguments
+  if [ ${#args[@]} -lt 2 ]; then
     echo "Error: Both level and message are required" >&2
     echo "Usage: log_json LEVEL MESSAGE" >&2
+    echo "Use --help for detailed usage information" >&2
     return 1
   fi
   
-  local level="$1"
-  local message="$2"
-
-  echo "$(jq -nc \
-    --arg level "$level" \
-    --arg message "$message" \
-    --arg time "$(date +"%Y-%m-%dT%H:%M:%S.%3N%z" | sed 's/\(..\)\(..\)$/\1:\2/')" \
-    '{timestamp: $time, level: $level, message: $message}')"
+  local level="${args[0]^^}"  # Convert to uppercase
+  local message="${args[1]}"
+  
+  # Validate log level
+  case "$level" in
+    DEBUG|INFO|WARN|WARNING|ERROR|FATAL)
+      ;;
+    *)
+      echo "Warning: '$level' is not a standard log level" >&2
+      ;;
+  esac
+  
+  # Start building jq arguments
+  local jq_args=(
+    --arg level "$level"
+    --arg message "$message"
+    --arg timestamp "$(date +"%Y-%m-%dT%H:%M:%S.%3N%z" | sed 's/\(..\)\(..\)$/\1:\2/')"
+  )
+  
+  # Add optional system fields
+  if [ "$include_pid" = true ]; then
+    jq_args+=(--arg pid "$$")
+  fi
+  
+  if [ "$include_hostname" = true ]; then
+    jq_args+=(--arg hostname "$(hostname)")
+  fi
+  
+  if [ "$include_user" = true ]; then
+    jq_args+=(--arg user "$(whoami)")
+  fi
+  
+  if [ -n "$context" ]; then
+    jq_args+=(--arg context "$context")
+  fi
+  
+  # Build the base JSON object
+  local base_obj='{"timestamp": $timestamp, "level": $level, "message": $message'
+  
+  # Add optional system fields to base object
+  if [ "$include_pid" = true ]; then
+    base_obj='{"timestamp": $timestamp, "level": $level, "message": $message, "pid": ($pid | tonumber)'
+  fi
+  
+  if [ "$include_hostname" = true ]; then
+    if [[ "$base_obj" == *'"pid"'* ]]; then
+      base_obj="${base_obj}, \"hostname\": \$hostname"
+    else
+      base_obj='{"timestamp": $timestamp, "level": $level, "message": $message, "hostname": $hostname'
+    fi
+  fi
+  
+  if [ "$include_user" = true ]; then
+    if [[ "$base_obj" == *'"hostname"'* ]] || [[ "$base_obj" == *'"pid"'* ]]; then
+      base_obj="${base_obj}, \"user\": \$user"
+    else
+      base_obj='{"timestamp": $timestamp, "level": $level, "message": $message, "user": $user'
+    fi
+  fi
+  
+  if [ -n "$context" ]; then
+    base_obj="${base_obj}, \"context\": \$context"
+  fi
+  
+  # Process additional key=value pairs
+  local additional_fields=()
+  local i
+  for ((i=2; i<${#args[@]}; i++)); do
+    local arg="${args[i]}"
+    if [[ "$arg" =~ ^[a-zA-Z_][a-zA-Z0-9_]*=.*$ ]]; then
+      local key="${arg%%=*}"
+      local value="${arg#*=}"
+      
+      # Try to parse value as number or boolean, otherwise treat as string
+      if [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        # Numeric value
+        jq_args+=(--arg "$key" "$value")
+        additional_fields+=("\"$key\": (\$$key | tonumber)")
+      elif [[ "$value" =~ ^(true|false)$ ]]; then
+        # Boolean value
+        jq_args+=(--arg "$key" "$value")
+        additional_fields+=("\"$key\": (\$$key == \"true\")")
+      else
+        # String value
+        jq_args+=(--arg "$key" "$value")
+        additional_fields+=("\"$key\": \$$key")
+      fi
+    else
+      echo "Warning: Ignoring invalid field format '$arg' (expected KEY=VALUE)" >&2
+    fi
+  done
+  
+  # Build final jq filter
+  local jq_filter="$base_obj"
+  if [ ${#additional_fields[@]} -gt 0 ]; then
+    local fields_str
+    fields_str=$(IFS=', '; echo "${additional_fields[*]}")
+    jq_filter="${jq_filter}, $fields_str}"
+  else
+    jq_filter="${jq_filter}}"
+  fi
+  
+  # Generate JSON output
+  echo "$(jq -nc "${jq_args[@]}" "$jq_filter")"
 }
 
 if [[ "$1" == "--version" ]]; then
@@ -31,6 +199,9 @@ if [[ "$1" == "--version" ]]; then
     VERSION="unknown"
   fi
   echo "log_json version v$VERSION"
+  exit 0
+elif [[ "$1" == "-h" || "$1" == "--help" ]]; then
+  show_help
   exit 0
 fi
 
