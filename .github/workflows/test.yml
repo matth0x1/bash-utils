@@ -38,4 +38,4 @@ jobs:
           files: "test-results.xml"
           report_individual_runs: true
           check_name: "Test Results"
-          comment_mode: create new
+          comment_mode: always
