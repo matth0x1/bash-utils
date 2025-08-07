@@ -104,7 +104,7 @@ echo -e "${YELLOW}Running tests...${NC}"
 # Count total tests first
 total_tests=$(bats --count "$TEST_DIR"/*.bats 2>/dev/null || echo "0")
 total_suites=$(ls -1 "$TEST_DIR"/*.bats 2>/dev/null | wc -l)
-total_files=1
+total_files=$TOTAL_FILES_DEFAULT
 
 # Get current commit hash
 commit_hash=$(cd "$PROJECT_ROOT" && git rev-parse HEAD 2>/dev/null | cut -c1-8 || echo "unknown")
