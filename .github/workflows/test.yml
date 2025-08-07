@@ -13,10 +13,20 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/bin/bats
+            /usr/bin/jq
+          key: ${{ runner.os }}-deps-bats-jq-${{ hashFiles('**/test.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-deps-bats-jq-
       
       - name: Set up permissions
         run: |
@@ -25,15 +35,31 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y bats jq
+          echo "Checking for required tools..."
+          missing_tools=()
+          
+          if ! command -v bats &> /dev/null; then
+            missing_tools+=("bats")
+          fi
+          
+          if ! command -v jq &> /dev/null; then
+            missing_tools+=("jq")
+          fi
+          
+          if [ ${#missing_tools[@]} -gt 0 ]; then
+            echo "Installing missing tools: ${missing_tools[*]}"
+            sudo apt-get update
+            sudo apt-get install -y "${missing_tools[@]}"
+          else
+            echo "All required tools are already available"
+          fi
 
       - name: Run tests
         run: ./test/run_tests.sh
       
       - name: Publish Test Results
         uses: EnricoMi/publish-unit-test-result-action@v2
-        if: always()
+        if: always() && !github.event.pull_request.draft
         with:
           files: "test-results.xml"
           report_individual_runs: true
