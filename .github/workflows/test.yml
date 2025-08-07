@@ -18,14 +18,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Cache dependencies
+      - name: Cache apt packages
         uses: actions/cache@v4
         with:
           path: |
             /var/cache/apt/archives
-          key: ${{ runner.os }}-apt-cache-${{ hashFiles('**/test.yml') }}
+            /var/lib/apt/lists
+          key: ${{ runner.os }}-apt-${{ hashFiles('**/test.yml') }}
           restore-keys: |
-            ${{ runner.os }}-apt-cache-
+            ${{ runner.os }}-apt-
       
       - name: Set up permissions
         run: |
@@ -34,23 +35,21 @@ jobs:
 
       - name: Install dependencies
         run: |
-          echo "Checking for required tools..."
-          missing_tools=()
+          # Check what's already available
+          echo "Checking pre-installed tools..."
+          jq --version 2>/dev/null && echo "jq: ✓ available" || echo "jq: ✗ missing"
+          bats --version 2>/dev/null && echo "bats: ✓ available" || echo "bats: ✗ missing"
           
-          if ! command -v bats &> /dev/null; then
-            missing_tools+=("bats")
-          fi
-          
-          if ! command -v jq &> /dev/null; then
-            missing_tools+=("jq")
-          fi
-          
-          if [ ${#missing_tools[@]} -gt 0 ]; then
-            echo "Installing missing tools: ${missing_tools[*]}"
-            sudo apt-get update
-            sudo apt-get install -y "${missing_tools[@]}"
+          # Install only what's needed
+          if ! command -v jq &> /dev/null || ! command -v bats &> /dev/null; then
+            echo "Installing missing dependencies..."
+            # Update apt cache only if packages need to be installed
+            if [ ! -f /var/cache/apt/pkgcache.bin ] || [ $(find /var/cache/apt/pkgcache.bin -mtime +1) ]; then
+              sudo apt-get update
+            fi
+            sudo apt-get install -y bats jq
           else
-            echo "All required tools are already available"
+            echo "All dependencies already available, skipping installation"
           fi
 
       - name: Run tests
