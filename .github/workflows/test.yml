@@ -12,7 +12,6 @@ permissions:
   pull-requests: write
 
 env:
-  CACHE_VERSION: v2
   REQUIRED_PACKAGES: "jq bats"
 
 jobs:
@@ -23,45 +22,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      - name: Cache system dependencies
-        id: cache-deps
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/apt-deps
-          key: ${{ runner.os }}-deps-${{ env.REQUIRED_PACKAGES }}-${{ env.CACHE_VERSION }}
-          restore-keys: |
-            ${{ runner.os }}-deps-${{ env.REQUIRED_PACKAGES }}-
-            ${{ runner.os }}-deps-
-      
       - name: Set up file permissions
         run: |
           find bin/ -type f -exec chmod +x {} \;
           find test/ -name "*.sh" -exec chmod +x {} \;
 
       - name: Install system dependencies
-        if: steps.cache-deps.outputs.cache-hit != 'true'
         run: |
           echo "Installing system dependencies: $REQUIRED_PACKAGES"
           sudo apt-get update -qq
           sudo apt-get install -y $REQUIRED_PACKAGES
-          
-          # Create cache marker
-          mkdir -p ~/.cache/apt-deps
-          echo "$REQUIRED_PACKAGES" > ~/.cache/apt-deps/packages.txt
-          date > ~/.cache/apt-deps/installed
-
-      - name: Verify dependencies
-        run: |
-          echo "Verifying installed dependencies..."
-          for pkg in $REQUIRED_PACKAGES; do
-            if command -v "$pkg" >/dev/null 2>&1; then
-              version=$($pkg --version 2>/dev/null | head -1 || echo "unknown")
-              echo "✓ $pkg: $version"
-            else
-              echo "✗ $pkg: not found"
-              exit 1
-            fi
-          done
 
       - name: Run tests
         run: ./test/run_tests.sh
