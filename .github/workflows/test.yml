@@ -22,11 +22,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            /usr/local/bin/bats
-            /usr/bin/jq
-          key: ${{ runner.os }}-deps-bats-jq-${{ hashFiles('**/test.yml') }}
+            /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-cache-${{ hashFiles('**/test.yml') }}
           restore-keys: |
-            ${{ runner.os }}-deps-bats-jq-
+            ${{ runner.os }}-apt-cache-
       
       - name: Set up permissions
         run: |
