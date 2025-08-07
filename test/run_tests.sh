@@ -23,7 +23,7 @@ display_test_results() {
     local is_success="$6"
     
     local total_suites=$(ls -1 "$TEST_DIR"/*.bats 2>/dev/null | wc -l)
-    local total_files=1
+    local total_files=$(ls -1 "$TEST_DIR"/*.bats 2>/dev/null | wc -l)
     
     echo ""
     echo "Test Results"
