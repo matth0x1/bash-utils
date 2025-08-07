@@ -24,11 +24,12 @@ display_test_results() {
     
     local total_suites=$(ls -1 "$TEST_DIR"/*.bats 2>/dev/null | wc -l)
     local total_files=$(ls -1 "$TEST_DIR"/*.bats 2>/dev/null | wc -l)
+    local skipped_suites=0
     
     echo ""
     echo "Test Results"
     printf "%4d tests        %2d ✓ %ds\n" "$total_tests" "$passed_tests" "$duration"
-    printf "%4d suites       %2d 💤\n" "$total_suites" "0"
+    printf "%4d suites       %2d 💤\n" "$total_suites" "$skipped_suites"
     printf "%4d files        %2d ❌\n" "$total_files" "$failed_tests"
     echo ""
     echo "  Results for commit ${commit_hash}."
