@@ -18,15 +18,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Cache apt packages
+      - name: Cache dependencies
         uses: actions/cache@v4
         with:
-          path: |
-            /var/cache/apt/archives
-            /var/lib/apt/lists
-          key: ${{ runner.os }}-apt-${{ hashFiles('**/test.yml') }}
+          path: ~/.cache/apt-deps
+          key: ${{ runner.os }}-deps-${{ hashFiles('.github/workflows/test.yml') }}-v1
           restore-keys: |
-            ${{ runner.os }}-apt-
+            ${{ runner.os }}-deps-
       
       - name: Set up permissions
         run: |
@@ -35,19 +33,27 @@ jobs:
 
       - name: Install dependencies
         run: |
+          # Create cache directory
+          mkdir -p ~/.cache/apt-deps
+          
           # Check what's already available
           echo "Checking pre-installed tools..."
           jq --version 2>/dev/null && echo "jq: ✓ available" || echo "jq: ✗ missing"
           bats --version 2>/dev/null && echo "bats: ✓ available" || echo "bats: ✗ missing"
           
+          # Check if we have cached installation marker
+          if [ -f ~/.cache/apt-deps/installed ]; then
+            echo "Dependencies were previously installed from cache"
+          fi
+          
           # Install only what's needed
           if ! command -v jq &> /dev/null || ! command -v bats &> /dev/null; then
             echo "Installing missing dependencies..."
-            # Update apt cache only if packages need to be installed
-            if [ ! -f /var/cache/apt/pkgcache.bin ] || [ $(find /var/cache/apt/pkgcache.bin -mtime +1) ]; then
-              sudo apt-get update
-            fi
+            sudo apt-get update
             sudo apt-get install -y bats jq
+            # Mark as installed in cache
+            touch ~/.cache/apt-deps/installed
+            echo "Dependencies installed and cached"
           else
             echo "All dependencies already available, skipping installation"
           fi
