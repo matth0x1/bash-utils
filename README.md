@@ -5,8 +5,8 @@ Reusable Bash utilities, installable via GitHub releases.
 ## 🔧 Install
 
 ```bash
-curl -L -o /usr/local/bin/log_json https://github.com/matth0x1/bash-utils/releases/download/latest/log_json
-chmod +x /usr/local/bin/log_json
+wget https://github.com/matth0x1/bash-utils/releases/latest/download/bash-utils.tar.gz
+tar xvzf bash-utils.tar.gz
 ```
 
 ## 🚀 Usage
