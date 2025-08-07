@@ -57,7 +57,7 @@ jobs:
       - name: Create release package
         run: |
           mkdir -p release
-          tar -czf release/bash-utils.tar.gz bin/
+          tar -czf release/bash-utils.tar.gz -C bin/ .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
