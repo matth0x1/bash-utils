@@ -62,7 +62,14 @@ copy_test_results() {
     local source_file="$1"
     local dest_file="$2"
     
-    cp "$source_file" "$dest_file" 2>/dev/null || true
+    if [ ! -f "$source_file" ]; then
+        echo -e "${YELLOW}Warning: Source file '$source_file' does not exist. Skipping copy.${NC}" >&2
+        return 1
+    fi
+    if ! cp "$source_file" "$dest_file" 2>/dev/null; then
+        echo -e "${RED}Error: Failed to copy '$source_file' to '$dest_file'.${NC}" >&2
+        return 1
+    fi
 }
 
 # Function to check if a command exists
