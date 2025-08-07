@@ -53,7 +53,7 @@ log_json() {
         include_pid=true
         shift
         ;;
-      --hostnagme)
+      --hostname)
         include_hostname=true
         shift
         ;;
